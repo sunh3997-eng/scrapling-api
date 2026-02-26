@@ -104,12 +104,16 @@ def scrape(req: ScrapeRequest, _: str = Depends(verify_key)):
                 page.css(req.selector) if req.selector else page.xpath(req.xpath)
             )
             if req.extract == "text":
-                data = [el.text for el in elements if el.text]
+                data = [_el_text(el) for el in elements if _el_text(el)]
             elif req.extract == "html":
                 data = [str(el) for el in elements]
             else:  # "all"
                 data = [
-                    {"text": el.text, "html": str(el), "attribs": dict(el.attrib or {})}
+                    {
+                        "text": _el_text(el),
+                        "html": str(el),
+                        "attribs": dict(el.attrib) if hasattr(el, "attrib") and el.attrib else {},
+                    }
                     for el in elements
                 ]
             element_count = len(elements)
@@ -117,7 +121,12 @@ def scrape(req: ScrapeRequest, _: str = Depends(verify_key)):
             raise HTTPException(status_code=422, detail=f"Selector error: {str(e)}")
     else:
         # No selector — return full page text
-        data = page.get_text(separator="\n", strip=True) if hasattr(page, "get_text") else str(page)
+        if hasattr(page, "get_all_text"):
+            data = page.get_all_text(separator="\n", ignore_tags=("script", "style"))
+        elif hasattr(page, "text"):
+            data = page.text
+        else:
+            data = str(page)
         element_count = None
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
@@ -162,7 +171,8 @@ def extract_multi(
     for field, sel in selectors.items():
         try:
             elements = page.css(sel)
-            result[field] = [el.text for el in elements if el.text] or None
+            texts = [_el_text(el) for el in elements if _el_text(el)]
+            result[field] = texts or None
         except Exception:
             result[field] = None
 
@@ -170,6 +180,18 @@ def extract_multi(
 
 
 # ─── Internal helpers ─────────────────────────────────────────────────────────
+
+def _el_text(el) -> Optional[str]:
+    """
+    Safely extract text from a Scrapling element.
+    - Adaptor (DOM node): use .text
+    - TextHandler (text/attr node from XPath): use str()
+    """
+    if hasattr(el, "text"):
+        return el.text or None
+    val = str(el).strip()
+    return val if val else None
+
 
 def _fetch_page(req: ScrapeRequest):
     """Route to the correct Scrapling fetcher based on mode."""
