@@ -213,8 +213,14 @@ def _fetch_page(req: ScrapeRequest):
         )
 
     elif req.mode == "dynamic":
-        from scrapling.fetchers import DynamicFetcher
-        return DynamicFetcher.fetch(
+        # DynamicFetcher (>=0.3) 或 PlayWrightFetcher (<0.3) 的兼容处理
+        try:
+            from scrapling.fetchers import DynamicFetcher
+            fetcher_cls = DynamicFetcher
+        except ImportError:
+            from scrapling.fetchers import PlayWrightFetcher
+            fetcher_cls = PlayWrightFetcher
+        return fetcher_cls.fetch(
             req.url,
             headless=req.headless,
             network_idle=req.wait_network_idle,
