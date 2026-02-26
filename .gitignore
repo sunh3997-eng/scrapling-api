@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.pyc
+.scrapling/
+*.db
+.DS_Store

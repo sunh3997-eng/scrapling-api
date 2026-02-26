@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - SCRAPLING_API_KEY=${SCRAPLING_API_KEY:-}
+    restart: unless-stopped
+    volumes:
+      - scrapling_cache:/root/.scrapling
+
+volumes:
+  scrapling_cache:
